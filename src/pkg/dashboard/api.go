@@ -5088,7 +5088,7 @@ func (s *Server) loadPromptTemplateRaw(name string) string {
 	return ""
 }
 
-const defaultPromptTemplateSaveDir = "/data/policies"
+const defaultPromptTemplateSaveDir = "/data/policies/user"
 
 // promptTemplateSaveDir is the durable location for operator-saved and baked
 // prompt templates. Tests redirect it before any server is constructed so a

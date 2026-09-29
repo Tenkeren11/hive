@@ -24,8 +24,8 @@ import (
 // scheduler must agree so a saved edit takes effect on the next kick.
 //
 // It is a var (not a const) only so tests can point it at a temp dir; production
-// always uses the fixed /data/policies path that handleAgentPromptSave writes to.
-var userSavedPolicyDir = "/data/policies"
+// always uses the fixed /data/policies/user path that handleAgentPromptSave writes to.
+var userSavedPolicyDir = "/data/policies/user"
 
 // agentHomeDir is where per-agent homes live on a hive host; the per-agent
 // CLAUDE.md (<agentHomeDir>/<name>/CLAUDE.md) is checked first by

@@ -8,17 +8,25 @@ import (
 	"testing"
 
 	"github.com/hivecommons/hive/pkg/config"
+	"github.com/hivecommons/hive/pkg/policies"
 )
 
 // withUserSavedPolicyDir points the user-saved policy dir at a temp dir for the
 // duration of a test and restores the production default afterward. In
-// production this is the fixed /data/policies path that the dashboard prompt
+// production this is the fixed /data/policies/user path that the dashboard prompt
 // editor (handleAgentPromptSave) writes to.
 func withUserSavedPolicyDir(t *testing.T, dir string) {
 	t.Helper()
 	prev := userSavedPolicyDir
 	userSavedPolicyDir = dir
 	t.Cleanup(func() { userSavedPolicyDir = prev })
+}
+
+func withClonedPoliciesDir(t *testing.T, dir string) {
+	t.Helper()
+	prev := clonedPoliciesDir
+	clonedPoliciesDir = dir
+	t.Cleanup(func() { clonedPoliciesDir = prev })
 }
 
 // TestKickUsesLatestSavedTemplate is the regression test for issue #3239: after
@@ -33,8 +41,8 @@ func withUserSavedPolicyDir(t *testing.T, dir string) {
 //
 // The kick must reflect the NEW copy.
 func TestKickUsesLatestSavedTemplate(t *testing.T) {
-	localDir := t.TempDir()   // stands in for the git-cloned /data/policies repo
-	savedDir := t.TempDir()   // stands in for /data/policies (user-saved overrides)
+	localDir := t.TempDir() // stands in for the git-cloned /data/policies repo
+	savedDir := t.TempDir() // stands in for /data/policies/user (user-saved overrides)
 	withUserSavedPolicyDir(t, savedDir)
 
 	// Old, git-cloned copy that used to win.
@@ -139,5 +147,35 @@ func TestLoadPromptTemplatePrefersUserSavedOverride(t *testing.T) {
 
 	if got := s.loadPromptTemplate("helper"); got != "NEW" {
 		t.Fatalf("loadPromptTemplate: expected user-saved override %q, got %q", "NEW", got)
+	}
+}
+
+func TestLoadNamedTemplateIgnoresStaleSeedMatchingEmbeddedDefault(t *testing.T) {
+	policyDir := t.TempDir()
+	withClonedPoliciesDir(t, policyDir)
+
+	const templateName = "scanner-holdgated.md"
+
+	embedded, err := policies.DefaultPolicies.ReadFile("defaults/" + templateName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := os.WriteFile(filepath.Join(policyDir, templateName), embedded, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := &config.Config{
+		Project: config.ProjectConfig{Org: "testorg", Name: "test"},
+		Agents:  map[string]config.AgentConfig{},
+	}
+	s := New(cfg, slog.Default())
+
+	content, source, _ := s.resolveNamedTemplate(templateName)
+	if content == "" {
+		t.Fatal("expected template content")
+	}
+	if source != TemplateSourceEmbedded {
+		t.Fatalf("stale seeded copy resolved from %q, want %q", source, TemplateSourceEmbedded)
 	}
 }
